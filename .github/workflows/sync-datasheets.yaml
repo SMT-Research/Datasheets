@@ -1,0 +1,101 @@
+name: Sync Datasheets to Pages
+
+on:
+  push:
+    # Trigger this whenever a new branch is pushed,
+    # EXCEPT for main and the gh-pages branch itself.
+    branches-ignore:
+      - main
+      - gh-pages
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to push changes to gh-pages
+
+    steps:
+      - name: Checkout Datasheet Branch
+        uses: actions/checkout@v4
+        with:
+          path: datasheet-source
+
+      - name: Checkout gh-pages Branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-destination
+
+      - name: Sync Files and Regenerate Index
+        run: |
+          # 1. Get the name of the branch that was just pushed
+          SOURCE_BRANCH="${{ github.ref_name }}"
+          echo "Processing branch: $SOURCE_BRANCH"
+
+          # 2. Find the datasheet (looking for any PDF in the root of the branch)
+          DATA_FILE=$(find datasheet-source -name "*.pdf" | head -n 1)
+
+          if [ -z "$DATA_FILE" ]; then
+            echo "No PDF found in branch $SOURCE_BRANCH. Skipping update."
+            exit 0
+          fi
+
+          # 3. Prepare destination folder (e.g., gh-pages/datasheets/ds-model-a/)
+          FILENAME=$(basename "$DATA_FILE")
+          DEST_DIR="gh-pages-destination/datasheets/$SOURCE_BRANCH"
+          mkdir -p "$DEST_DIR"
+
+          # 4. Copy the file to the gh-pages branch
+          cp "$DATA_FILE" "$DEST_DIR/$FILENAME"
+
+          # 5. Regenerate the index.html file
+          echo "Regenerating index.html..."
+          cat <<EOF > gh-pages-destination/index.html
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Datasheet Library</title>
+            <style>
+              body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px;
+color: #333; }
+              h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+              ul { list-style: none; padding: 0; }
+              li { background: #f4f4f4; margin: 5px 0; padding: 10px; border-radius: 4px; }
+              a { text-decoration: none; color: #0066cc; font-weight: bold; }
+              a:hover { text-decoration: underline; }
+              .branch-label { font-size: 0.8em; color: #666; margin-left: 10px; }
+            </style>
+          </head>
+          <body>
+            <h1>Datasheet Library</h1>
+            <ul>
+          EOF
+
+          # 6. Loop through all PDF files in the gh-pages 'datasheets' folder to build the list
+          find gh-pages-destination/datasheets -name "*.pdf" | sort | while read -r file; do
+            # Calculate the relative URL for the link
+            # Example: gh-pages-destination/datasheets/ds-a/file.pdf -> datasheets/ds-a/file.pdf
+            REL_PATH=$(echo "$file" | sed 's|gh-pages-destination/||')
+
+            # Create a pretty display name from the filename
+            DISPLAY_NAME=$(basename "$file" .pdf | tr '-' ' ' | sed 's/\b\(.\)/\u\1/g')
+
+            # Extract branch name from path for a label
+            B_NAME=$(echo "$REL_PATH" | cut -d'/' -f2)
+
+            echo "<li><a href=\"$REL_PATH\">$DISPLAY_NAME</a> <span class=\"branch-label">($B_NAME)</span></li>" >>
+gh-pages-destination/index.html
+          done
+
+          echo "</ul></body></html>" >> gh-pages-destination/index.html
+
+      - name: Commit and Push to gh-pages
+        run: |
+          cd gh-pages-destination
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          # Use || exit 0 so the workflow doesn't fail if there are no changes to commit
+          git commit -m "Update datasheet list for branch ${{ github.ref_name }}" || exit 0
+          git push origin gh-pages
