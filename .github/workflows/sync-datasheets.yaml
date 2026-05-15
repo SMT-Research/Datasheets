@@ -57,8 +57,7 @@ jobs:
             <meta charset="UTF-8">
             <title>Datasheet Library</title>
             <style>
-              body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px;
-              color: #333; }
+              body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
               h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
               ul { list-style: none; padding: 0; }
               li { background: #f4f4f4; margin: 5px 0; padding: 10px; border-radius: 4px; }
@@ -84,7 +83,7 @@ jobs:
             # Extract branch name from path for a label
             B_NAME=$(echo "$REL_PATH" | cut -d'/' -f2)
 
-            echo "<li><a href="$REL_PATH">$DISPLAY_NAME</a> <span class="branch-label">($B_NAME)</span></li>" >> gh-pages-destination/index.html
+            echo "<li><a href=\"$REL_PATH\">$DISPLAY_NAME</a> <span class=\"branch-label\">($B_NAME)</span></li>" >> gh-pages-destination/index.html
           done
 
           echo "</ul></body></html>" >> gh-pages-destination/index.html
